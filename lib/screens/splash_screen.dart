@@ -48,12 +48,54 @@ class _SplashScreenState extends State<SplashScreen> {
             children: [
               const Spacer(flex: 3),
               // Animated weather icon
-              const Hero(
+              Hero(
                     tag: 'app_logo',
-                    child: Icon(
-                      Icons.wb_sunny_rounded,
-                      size: 100,
-                      color: Colors.white,
+                    child: SizedBox(
+                      width: 120,
+                      height: 120,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 75,
+                            height: 75,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.amberAccent.withValues(alpha: 0.25),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.amberAccent.withValues(
+                                    alpha: 0.4,
+                                  ),
+                                  blurRadius: 24,
+                                  spreadRadius: 6,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.wb_sunny_rounded,
+                            size: 76,
+                            color: Colors.amber,
+                          ),
+                          Positioned(
+                            right: 6,
+                            bottom: 6,
+                            child: Icon(
+                              Icons.cloud_rounded,
+                              size: 52,
+                              color: Colors.white.withValues(alpha: 0.95),
+                              shadows: const [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 8,
+                                  offset: Offset(2, 4),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                   .animate(onPlay: (controller) => controller.repeat())
