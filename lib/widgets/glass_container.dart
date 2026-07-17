@@ -60,7 +60,9 @@ class GlassContainer extends StatelessWidget {
                 ],
               ),
               border: Border.all(
-                color: (borderColor ?? Colors.white).withValues(alpha: borderOpacity),
+                color: (borderColor ?? Colors.white).withValues(
+                  alpha: borderOpacity,
+                ),
                 width: 1.2,
               ),
             ),

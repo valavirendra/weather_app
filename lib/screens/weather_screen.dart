@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
 import '../providers/weather_provider.dart';
 import '../models/weather_model.dart';
 import '../widgets/weather_info_tile.dart';
@@ -11,6 +11,9 @@ import '../widgets/hourly_forecast_card.dart';
 import '../widgets/daily_forecast_list.dart';
 import '../widgets/sunrise_sunset_visual.dart';
 import '../widgets/saved_locations_drawer.dart';
+import '../services/location_service.dart';
+import '../services/permission_service.dart';
+import 'loading_screen.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -25,7 +28,10 @@ class _WeatherScreenState extends State<WeatherScreen>
   final TextEditingController _searchController = TextEditingController();
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  bool _isFetchingLocation = false;
+
+  final PermissionService _permissionService = PermissionService();
+  final LocationService _locationService = LocationService();
+  bool _isFetchingLocation = true;
 
   // Quick city shortcuts
   static const List<Map<String, String>> _quickCities = [
@@ -62,51 +68,155 @@ class _WeatherScreenState extends State<WeatherScreen>
   }
 
   Future<void> _getCurrentLocation() async {
-    if (_isFetchingLocation) return;
     setState(() => _isFetchingLocation = true);
 
     try {
-      // Skip isLocationServiceEnabled — always returns false on web (Chrome).
-      // Go straight to permission check which triggers the browser prompt.
-      LocationPermission permission = await Geolocator.checkPermission();
-
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+      // 1. Check Location Service Status (GPS)
+      final isServiceEnabled = await _locationService
+          .isLocationServiceEnabled();
+      if (!isServiceEnabled) {
+        if (!mounted) return;
+        final openSettings = await _showEnableLocationDialog();
+        if (openSettings) {
+          await _locationService.openLocationSettings();
+        } else {
+          _fallbackToDefaultCity('Location Services disabled. Showing Tokyo.');
+          return;
+        }
+        final retryServiceEnabled = await _locationService
+            .isLocationServiceEnabled();
+        if (!retryServiceEnabled) {
+          _fallbackToDefaultCity('Location Services disabled. Showing Tokyo.');
+          return;
+        }
       }
 
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        // User refused — fall back to a default city
-        if (mounted) {
-          context.read<WeatherProvider>().fetchWeatherByCity('Tokyo');
-          _showLocationSnackBar('Location permission denied. Showing Tokyo.');
+      // 2. Check Permission Status
+      ph.PermissionStatus permission = await _permissionService
+          .checkLocationPermission();
+
+      if (permission == ph.PermissionStatus.denied) {
+        if (!mounted) return;
+        final proceed = await _showPermissionExplanationDialog();
+        if (proceed) {
+          permission = await _permissionService.requestLocationPermission();
+        } else {
+          _fallbackToDefaultCity('Location permission denied. Showing Tokyo.');
+          return;
+        }
+      }
+
+      if (permission == ph.PermissionStatus.permanentlyDenied) {
+        if (!mounted) return;
+        final openSettings = await _showPermanentlyDeniedDialog();
+        if (openSettings) {
+          await _permissionService.openSettings();
+        } else {
+          _fallbackToDefaultCity(
+            'Location permission permanently denied. Showing Tokyo.',
+          );
         }
         return;
       }
 
-      // Fetch position with a 15-second timeout
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.low,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
-
-      if (mounted) {
-        context.read<WeatherProvider>().fetchWeatherByCoords(
-              position.latitude,
-              position.longitude,
-            );
+      if (permission == ph.PermissionStatus.granted ||
+          permission == ph.PermissionStatus.limited) {
+        final position = await _locationService.getCurrentPosition();
+        if (mounted) {
+          await context.read<WeatherProvider>().fetchWeatherByCoords(
+            position.latitude,
+            position.longitude,
+          );
+        }
+      } else {
+        _fallbackToDefaultCity(
+          'Location permission not granted. Showing Tokyo.',
+        );
       }
     } catch (e) {
-      // Timeout or any other error → fall back gracefully
-      if (mounted) {
-        context.read<WeatherProvider>().fetchWeatherByCity('Tokyo');
-        _showLocationSnackBar('Could not get location. Showing Tokyo.');
-      }
+      _fallbackToDefaultCity('Could not get location. Showing Tokyo.');
     } finally {
       if (mounted) setState(() => _isFetchingLocation = false);
     }
+  }
+
+  void _fallbackToDefaultCity(String message) {
+    if (mounted) {
+      context.read<WeatherProvider>().fetchWeatherByCity('Tokyo');
+      _showLocationSnackBar(message);
+    }
+  }
+
+  Future<bool> _showEnableLocationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Enable Location'),
+            content: const Text(
+              'Please enable Location Services to get accurate weather updates.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<bool> _showPermissionExplanationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Location Permission'),
+            content: const Text(
+              'WeatherNow needs access to your location to fetch real-time weather information for your current city.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Grant Permission'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<bool> _showPermanentlyDeniedDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Permission Required'),
+            content: const Text(
+              'Location permission has been permanently denied. Please enable it in the App Settings to get weather updates for your current location.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   void _showLocationSnackBar(String message) {
@@ -130,7 +240,8 @@ class _WeatherScreenState extends State<WeatherScreen>
 
   Future<void> _openInMaps(String cityName) async {
     final uri = Uri.parse(
-        'https://www.google.com/maps/search/${Uri.encodeComponent(cityName)}');
+      'https://www.google.com/maps/search/${Uri.encodeComponent(cityName)}',
+    );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -147,8 +258,14 @@ class _WeatherScreenState extends State<WeatherScreen>
       return [const Color(0xFF0072FF), const Color(0xFF00C6FF)];
     } else if (icon.contains('01n')) {
       // Clear night — cosmic purple-midnight
-      return [const Color(0xFF0F0C29), const Color(0xFF302B63), const Color(0xFF24243E)];
-    } else if (icon.contains('02') || icon.contains('03') || icon.contains('04')) {
+      return [
+        const Color(0xFF0F0C29),
+        const Color(0xFF302B63),
+        const Color(0xFF24243E),
+      ];
+    } else if (icon.contains('02') ||
+        icon.contains('03') ||
+        icon.contains('04')) {
       // Cloudy — vivid indigo-blue
       return weather.isDaytime
           ? [const Color(0xFF373B44), const Color(0xFF4286F4)]
@@ -158,7 +275,11 @@ class _WeatherScreenState extends State<WeatherScreen>
       return [const Color(0xFF4776E6), const Color(0xFF8E54E9)];
     } else if (icon.contains('11')) {
       // Thunderstorm — dramatic charcoal red
-      return [const Color(0xFF1A0533), const Color(0xFF3D0C5E), const Color(0xFF0D0D0D)];
+      return [
+        const Color(0xFF1A0533),
+        const Color(0xFF3D0C5E),
+        const Color(0xFF0D0D0D),
+      ];
     } else if (icon.contains('13')) {
       // Snow — bright icy cyan-blue
       return [const Color(0xFF4481EB), const Color(0xFF04BEFE)];
@@ -171,19 +292,36 @@ class _WeatherScreenState extends State<WeatherScreen>
 
   // Accent color per gradient (used for glow effects)
   Color _getAccentColor(Weather? weather) {
-    if (weather == null) return const Color(0xFF6C63FF);
+    if (weather == null) {
+      return const Color(0xFF6C63FF);
+    }
     final icon = weather.icon;
-    if (icon.contains('01d')) return const Color(0xFF00C6FF);
-    if (icon.contains('01n')) return const Color(0xFF7C6DE8);
-    if (icon.contains('09') || icon.contains('10')) return const Color(0xFF8E54E9);
-    if (icon.contains('11')) return const Color(0xFFFF416C);
-    if (icon.contains('13')) return const Color(0xFF04BEFE);
-    if (icon.contains('50')) return const Color(0xFF8F94FB);
+    if (icon.contains('01d')) {
+      return const Color(0xFF00C6FF);
+    }
+    if (icon.contains('01n')) {
+      return const Color(0xFF7C6DE8);
+    }
+    if (icon.contains('09') || icon.contains('10')) {
+      return const Color(0xFF8E54E9);
+    }
+    if (icon.contains('11')) {
+      return const Color(0xFFFF416C);
+    }
+    if (icon.contains('13')) {
+      return const Color(0xFF04BEFE);
+    }
+    if (icon.contains('50')) {
+      return const Color(0xFF8F94FB);
+    }
     return const Color(0xFF4286F4);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isFetchingLocation) {
+      return const LoadingScreen();
+    }
     return Consumer<WeatherProvider>(
       builder: (context, provider, _) {
         final gradient = _getGradient(provider.weather);
@@ -273,7 +411,11 @@ class _WeatherScreenState extends State<WeatherScreen>
           borderOpacity: 0.2,
           child: InkWell(
             onTap: () => _scaffoldKey.currentState?.openDrawer(),
-            child: const Icon(Icons.menu_rounded, color: Colors.white, size: 22),
+            child: const Icon(
+              Icons.menu_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
         ),
         const SizedBox(width: 10),
@@ -299,25 +441,39 @@ class _WeatherScreenState extends State<WeatherScreen>
                 decoration: InputDecoration(
                   hintText: 'Search city...',
                   hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5), fontSize: 15),
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 15,
+                  ),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
                   prefixIcon: const Padding(
                     padding: EdgeInsets.only(right: 8),
-                    child: Icon(Icons.search_rounded, color: Colors.white60, size: 20),
+                    child: Icon(
+                      Icons.search_rounded,
+                      color: Colors.white60,
+                      size: 20,
+                    ),
                   ),
-                  prefixIconConstraints: const BoxConstraints(minWidth: 28, minHeight: 0),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 0,
+                  ),
                   suffixIcon: provider.weather != null
                       ? GestureDetector(
-                          onTap: () => provider.toggleFavorite(provider.weather!.cityName),
+                          onTap: () => provider.toggleFavorite(
+                            provider.weather!.cityName,
+                          ),
                           child: Padding(
                             padding: const EdgeInsets.only(left: 6),
                             child: Icon(
                               provider.isFavorite(provider.weather!.cityName)
                                   ? Icons.bookmark_rounded
                                   : Icons.bookmark_border_rounded,
-                              color: provider.isFavorite(provider.weather!.cityName)
+                              color:
+                                  provider.isFavorite(
+                                    provider.weather!.cityName,
+                                  )
                                   ? Colors.amberAccent
                                   : Colors.white70,
                               size: 20,
@@ -325,7 +481,10 @@ class _WeatherScreenState extends State<WeatherScreen>
                           ),
                         )
                       : null,
-                  suffixIconConstraints: const BoxConstraints(minWidth: 30, minHeight: 0),
+                  suffixIconConstraints: const BoxConstraints(
+                    minWidth: 30,
+                    minHeight: 0,
+                  ),
                 ),
               ),
             ),
@@ -351,8 +510,9 @@ class _WeatherScreenState extends State<WeatherScreen>
         child: Stack(
           children: [
             AnimatedAlign(
-              alignment:
-                  provider.isCelsius ? Alignment.centerLeft : Alignment.centerRight,
+              alignment: provider.isCelsius
+                  ? Alignment.centerLeft
+                  : Alignment.centerRight,
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeInOut,
               child: Container(
@@ -362,7 +522,11 @@ class _WeatherScreenState extends State<WeatherScreen>
                   color: Colors.white,
                   shape: BoxShape.circle,
                   boxShadow: [
-                    BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
                   ],
                 ),
                 child: Center(
@@ -378,8 +542,9 @@ class _WeatherScreenState extends State<WeatherScreen>
               ),
             ),
             Align(
-              alignment:
-                  provider.isCelsius ? Alignment.centerRight : Alignment.centerLeft,
+              alignment: provider.isCelsius
+                  ? Alignment.centerRight
+                  : Alignment.centerLeft,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
@@ -432,7 +597,9 @@ class _WeatherScreenState extends State<WeatherScreen>
                     ? []
                     : [
                         BoxShadow(
-                          color: const Color(0xFF4776E6).withValues(alpha: 0.45),
+                          color: const Color(
+                            0xFF4776E6,
+                          ).withValues(alpha: 0.45),
                           blurRadius: 10,
                           spreadRadius: 1,
                         ),
@@ -472,15 +639,18 @@ class _WeatherScreenState extends State<WeatherScreen>
           // ── City shortcut chips ───────────────────────────────────────────
           ...List.generate(_quickCities.length, (index) {
             final city = _quickCities[index];
-            final isActive = provider.weather?.cityName.toLowerCase() ==
+            final isActive =
+                provider.weather?.cityName.toLowerCase() ==
                 city['name']!.toLowerCase();
             return GestureDetector(
               onTap: () => provider.fetchWeatherByCity(city['name']!),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 margin: const EdgeInsets.only(right: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: isActive
                       ? Colors.white.withValues(alpha: 0.28)
@@ -496,11 +666,11 @@ class _WeatherScreenState extends State<WeatherScreen>
                 child: Text(
                   '${city['flag']} ${city['name']}',
                   style: TextStyle(
-                    color:
-                        Colors.white.withValues(alpha: isActive ? 1.0 : 0.75),
+                    color: Colors.white.withValues(
+                      alpha: isActive ? 1.0 : 0.75,
+                    ),
                     fontSize: 13,
-                    fontWeight:
-                        isActive ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ),
@@ -585,7 +755,9 @@ class _WeatherScreenState extends State<WeatherScreen>
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 32, vertical: 16),
+                  horizontal: 32,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   gradient: _isFetchingLocation
                       ? null
@@ -602,8 +774,9 @@ class _WeatherScreenState extends State<WeatherScreen>
                       ? []
                       : [
                           BoxShadow(
-                            color:
-                                const Color(0xFF4776E6).withValues(alpha: 0.5),
+                            color: const Color(
+                              0xFF4776E6,
+                            ).withValues(alpha: 0.5),
                             blurRadius: 24,
                             spreadRadius: 2,
                             offset: const Offset(0, 6),
@@ -655,9 +828,10 @@ class _WeatherScreenState extends State<WeatherScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                    width: 50,
-                    height: 1,
-                    color: Colors.white.withValues(alpha: 0.2)),
+                  width: 50,
+                  height: 1,
+                  color: Colors.white.withValues(alpha: 0.2),
+                ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Text(
@@ -669,9 +843,10 @@ class _WeatherScreenState extends State<WeatherScreen>
                   ),
                 ),
                 Container(
-                    width: 50,
-                    height: 1,
-                    color: Colors.white.withValues(alpha: 0.2)),
+                  width: 50,
+                  height: 1,
+                  color: Colors.white.withValues(alpha: 0.2),
+                ),
               ],
             ),
           ],
@@ -700,7 +875,9 @@ class _WeatherScreenState extends State<WeatherScreen>
             Text(
               'Loading forecast data...',
               style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
             ),
           ],
         ),
@@ -708,18 +885,28 @@ class _WeatherScreenState extends State<WeatherScreen>
     );
   }
 
-  Widget _buildErrorState(String message, WeatherProvider provider, Color accent) {
+  Widget _buildErrorState(
+    String message,
+    WeatherProvider provider,
+    Color accent,
+  ) {
     return SizedBox(
       height: MediaQuery.of(context).size.height * 0.6,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.cloud_off_rounded, size: 70, color: Colors.white70),
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 70,
+              color: Colors.white70,
+            ),
             const SizedBox(height: 16),
-            Text(message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: provider.refresh,
@@ -729,8 +916,13 @@ class _WeatherScreenState extends State<WeatherScreen>
                 backgroundColor: Colors.white.withValues(alpha: 0.2),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 13,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ],
@@ -740,80 +932,88 @@ class _WeatherScreenState extends State<WeatherScreen>
   }
 
   Widget _buildWeatherContent(
-      Weather weather, WeatherProvider provider, Color accent) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final isWide = constraints.maxWidth > 660;
+    Weather weather,
+    WeatherProvider provider,
+    Color accent,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 660;
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // ── Hero temperature display ──────────────────────
-          _buildHeroDisplay(weather, provider, accent),
-          const SizedBox(height: 28),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // ── Hero temperature display ──────────────────────
+            _buildHeroDisplay(weather, provider, accent),
+            const SizedBox(height: 28),
 
-          // ── View on Maps button ───────────────────────────
-          _buildMapButton(weather, accent),
-          const SizedBox(height: 24),
+            // ── View on Maps button ───────────────────────────
+            _buildMapButton(weather, accent),
+            const SizedBox(height: 24),
 
-          // ── Details grid + hourly (side-by-side on wide) ─
-          if (isWide)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 5,
-                  child: Column(
-                    children: [
-                      HourlyForecastCard(
-                        forecasts: weather.hourlyForecasts,
-                        isCelsius: provider.isCelsius,
-                      ),
-                      const SizedBox(height: 16),
-                      DailyForecastList(
-                        forecasts: weather.dailyForecasts,
-                        isCelsius: provider.isCelsius,
-                      ),
-                    ],
+            // ── Details grid + hourly (side-by-side on wide) ─
+            if (isWide)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: Column(
+                      children: [
+                        HourlyForecastCard(
+                          forecasts: weather.hourlyForecasts,
+                          isCelsius: provider.isCelsius,
+                        ),
+                        const SizedBox(height: 16),
+                        DailyForecastList(
+                          forecasts: weather.dailyForecasts,
+                          isCelsius: provider.isCelsius,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 4,
-                  child: Column(
-                    children: [
-                      _buildDetailsGrid(weather, provider),
-                      const SizedBox(height: 16),
-                      SunriseSunsetVisual(weather: weather),
-                    ],
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 4,
+                    child: Column(
+                      children: [
+                        _buildDetailsGrid(weather, provider),
+                        const SizedBox(height: 16),
+                        SunriseSunsetVisual(weather: weather),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            )
-          else
-            Column(
-              children: [
-                HourlyForecastCard(
-                  forecasts: weather.hourlyForecasts,
-                  isCelsius: provider.isCelsius,
-                ),
-                const SizedBox(height: 16),
-                DailyForecastList(
-                  forecasts: weather.dailyForecasts,
-                  isCelsius: provider.isCelsius,
-                ),
-                const SizedBox(height: 16),
-                _buildDetailsGrid(weather, provider),
-                const SizedBox(height: 16),
-                SunriseSunsetVisual(weather: weather),
-              ],
-            ),
-        ],
-      );
-    });
+                ],
+              )
+            else
+              Column(
+                children: [
+                  HourlyForecastCard(
+                    forecasts: weather.hourlyForecasts,
+                    isCelsius: provider.isCelsius,
+                  ),
+                  const SizedBox(height: 16),
+                  DailyForecastList(
+                    forecasts: weather.dailyForecasts,
+                    isCelsius: provider.isCelsius,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildDetailsGrid(weather, provider),
+                  const SizedBox(height: 16),
+                  SunriseSunsetVisual(weather: weather),
+                ],
+              ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildHeroDisplay(
-      Weather weather, WeatherProvider provider, Color accent) {
+    Weather weather,
+    WeatherProvider provider,
+    Color accent,
+  ) {
     final double currentTemp = provider.isCelsius
         ? weather.tempCelsius
         : (weather.tempCelsius * 9 / 5) + 32;
@@ -833,7 +1033,11 @@ class _WeatherScreenState extends State<WeatherScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.location_on_rounded, color: Colors.white60, size: 16),
+            const Icon(
+              Icons.location_on_rounded,
+              color: Colors.white60,
+              size: 16,
+            ),
             const SizedBox(width: 4),
             Text(
               '${weather.cityName}, ${weather.country}',
@@ -860,8 +1064,11 @@ class _WeatherScreenState extends State<WeatherScreen>
                           color: Colors.white60,
                         ),
                       )
-                    : Icon(Icons.my_location_rounded,
-                        color: Colors.white.withValues(alpha: 0.6), size: 16),
+                    : Icon(
+                        Icons.my_location_rounded,
+                        color: Colors.white.withValues(alpha: 0.6),
+                        size: 16,
+                      ),
               ),
             ),
           ],
@@ -952,49 +1159,67 @@ class _WeatherScreenState extends State<WeatherScreen>
               // Actual temperature
               Row(
                 children: [
-                  const Icon(Icons.thermostat_rounded,
-                      size: 14, color: Colors.orangeAccent),
+                  const Icon(
+                    Icons.thermostat_rounded,
+                    size: 14,
+                    color: Colors.orangeAccent,
+                  ),
                   const SizedBox(width: 2),
                   Text(
                     'Actual: ${currentTemp.toStringAsFixed(0)}°',
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
               Container(
-                  width: 1, height: 16, color: Colors.white24,
-                  margin: const EdgeInsets.symmetric(horizontal: 14)),
+                width: 1,
+                height: 16,
+                color: Colors.white24,
+                margin: const EdgeInsets.symmetric(horizontal: 14),
+              ),
               Row(
                 children: [
-                  const Icon(Icons.arrow_upward_rounded,
-                      size: 14, color: Colors.pinkAccent),
+                  const Icon(
+                    Icons.arrow_upward_rounded,
+                    size: 14,
+                    color: Colors.pinkAccent,
+                  ),
                   const SizedBox(width: 2),
                   Text(
                     'H: ${maxTemp.toStringAsFixed(0)}°',
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
               Container(
-                  width: 1, height: 16, color: Colors.white24,
-                  margin: const EdgeInsets.symmetric(horizontal: 14)),
+                width: 1,
+                height: 16,
+                color: Colors.white24,
+                margin: const EdgeInsets.symmetric(horizontal: 14),
+              ),
               Row(
                 children: [
-                  const Icon(Icons.arrow_downward_rounded,
-                      size: 14, color: Colors.cyanAccent),
+                  const Icon(
+                    Icons.arrow_downward_rounded,
+                    size: 14,
+                    color: Colors.cyanAccent,
+                  ),
                   const SizedBox(width: 2),
                   Text(
                     'L: ${minTemp.toStringAsFixed(0)}°',
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -1027,7 +1252,11 @@ class _WeatherScreenState extends State<WeatherScreen>
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(Icons.open_in_new_rounded, color: Colors.white54, size: 14),
+            const Icon(
+              Icons.open_in_new_rounded,
+              color: Colors.white54,
+              size: 14,
+            ),
           ],
         ),
       ),

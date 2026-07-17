@@ -50,13 +50,15 @@ class WeatherProvider with ChangeNotifier {
   void toggleFavorite(String city) {
     final cleaned = city.trim();
     if (cleaned.isEmpty) return;
-    final index =
-        _savedCities.indexWhere((c) => c.toLowerCase() == cleaned.toLowerCase());
+    final index = _savedCities.indexWhere(
+      (c) => c.toLowerCase() == cleaned.toLowerCase(),
+    );
     if (index >= 0) {
       _savedCities.removeAt(index);
     } else {
       _savedCities.add(
-          cleaned[0].toUpperCase() + cleaned.substring(1).toLowerCase());
+        cleaned[0].toUpperCase() + cleaned.substring(1).toLowerCase(),
+      );
     }
     notifyListeners();
   }
@@ -69,10 +71,10 @@ class WeatherProvider with ChangeNotifier {
     _setLoading();
 
     try {
-      final url =
-          Uri.parse('$_baseUrl?q=${Uri.encodeComponent(city)}&appid=$_apiKey');
-      final response =
-          await http.get(url).timeout(const Duration(seconds: 10));
+      final url = Uri.parse(
+        '$_baseUrl?q=${Uri.encodeComponent(city)}&appid=$_apiKey',
+      );
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         _handleResponse(response);
@@ -96,10 +98,8 @@ class WeatherProvider with ChangeNotifier {
     _setLoading();
 
     try {
-      final url =
-          Uri.parse('$_baseUrl?lat=$lat&lon=$lon&appid=$_apiKey');
-      final response =
-          await http.get(url).timeout(const Duration(seconds: 10));
+      final url = Uri.parse('$_baseUrl?lat=$lat&lon=$lon&appid=$_apiKey');
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         _handleResponse(response);
@@ -193,13 +193,15 @@ class WeatherProvider with ChangeNotifier {
           ? baseIcon.replaceAll('d', 'n')
           : baseIcon.replaceAll('n', 'd');
 
-      hourly.add(HourlyForecast(
-        time: time,
-        tempCelsius: temp,
-        icon: hourlyIcon,
-        description: desc,
-        windSpeed: baseWind + (i % 2 == 0 ? 0.4 : -0.3),
-      ));
+      hourly.add(
+        HourlyForecast(
+          time: time,
+          tempCelsius: temp,
+          icon: hourlyIcon,
+          description: desc,
+          windSpeed: baseWind + (i % 2 == 0 ? 0.4 : -0.3),
+        ),
+      );
     }
     return hourly;
   }
@@ -214,13 +216,15 @@ class WeatherProvider with ChangeNotifier {
     for (int i = 0; i < 7; i++) {
       final date = now.add(Duration(days: i));
       final dayOffset = (i * 1.2 - 2.5);
-      daily.add(DailyForecast(
-        date: date,
-        minTempCelsius: baseTemp - 4.0 + dayOffset,
-        maxTempCelsius: baseTemp + 3.0 + dayOffset,
-        icon: baseIcon,
-        description: desc,
-      ));
+      daily.add(
+        DailyForecast(
+          date: date,
+          minTempCelsius: baseTemp - 4.0 + dayOffset,
+          maxTempCelsius: baseTemp + 3.0 + dayOffset,
+          icon: baseIcon,
+          description: desc,
+        ),
+      );
     }
     return daily;
   }
@@ -239,7 +243,13 @@ class WeatherProvider with ChangeNotifier {
     int pressure;
     int visibility;
 
-    if (_matchesAny(lower, ['london', 'paris', 'seattle', 'manchester', 'rain'])) {
+    if (_matchesAny(lower, [
+      'london',
+      'paris',
+      'seattle',
+      'manchester',
+      'rain',
+    ])) {
       temp = 283.15 + (lower.length % 5);
       desc = 'Light Rain';
       icon = '10d';
@@ -248,7 +258,15 @@ class WeatherProvider with ChangeNotifier {
       clouds = 80;
       pressure = 1008;
       visibility = 7000;
-    } else if (_matchesAny(lower, ['cairo', 'dubai', 'miami', 'sydney', 'delhi', 'hot', 'sunny'])) {
+    } else if (_matchesAny(lower, [
+      'cairo',
+      'dubai',
+      'miami',
+      'sydney',
+      'delhi',
+      'hot',
+      'sunny',
+    ])) {
       temp = 304.15 + (lower.length % 8);
       desc = 'Clear Sky';
       icon = '01d';
@@ -257,7 +275,14 @@ class WeatherProvider with ChangeNotifier {
       clouds = 5;
       pressure = 1015;
       visibility = 10000;
-    } else if (_matchesAny(lower, ['reykjavik', 'anchorage', 'oslo', 'helsinki', 'snow', 'cold'])) {
+    } else if (_matchesAny(lower, [
+      'reykjavik',
+      'anchorage',
+      'oslo',
+      'helsinki',
+      'snow',
+      'cold',
+    ])) {
       temp = 269.15 + (lower.length % 6);
       desc = 'Light Snow';
       icon = '13d';
@@ -281,11 +306,26 @@ class WeatherProvider with ChangeNotifier {
       temp = 273.15 + 16.0 + tempOffset;
 
       const descOptions = [
-        'Clear Sky', 'Few Clouds', 'Scattered Clouds', 'Broken Clouds',
-        'Light Rain', 'Heavy Rain', 'Thunderstorm', 'Light Snow', 'Mist',
+        'Clear Sky',
+        'Few Clouds',
+        'Scattered Clouds',
+        'Broken Clouds',
+        'Light Rain',
+        'Heavy Rain',
+        'Thunderstorm',
+        'Light Snow',
+        'Mist',
       ];
       const iconOptions = [
-        '01d', '02d', '03d', '04d', '10d', '09d', '11d', '13d', '50d',
+        '01d',
+        '02d',
+        '03d',
+        '04d',
+        '10d',
+        '09d',
+        '11d',
+        '13d',
+        '50d',
       ];
       final idx = hash % descOptions.length;
       desc = descOptions[idx];

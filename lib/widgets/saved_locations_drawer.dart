@@ -23,7 +23,10 @@ class SavedLocationsDrawer extends StatelessWidget {
             padding: EdgeInsets.zero,
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -32,7 +35,11 @@ class SavedLocationsDrawer extends StatelessWidget {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.bookmark_rounded, color: Colors.white, size: 22),
+                            Icon(
+                              Icons.bookmark_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
                             SizedBox(width: 8),
                             Text(
                               'My Locations',
@@ -46,12 +53,18 @@ class SavedLocationsDrawer extends StatelessWidget {
                         ),
                         IconButton(
                           onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close_rounded, color: Colors.white),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
+                    Divider(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      height: 1,
+                    ),
                     const SizedBox(height: 16),
                     if (cities.isEmpty)
                       Expanded(
@@ -92,7 +105,8 @@ class SavedLocationsDrawer extends StatelessWidget {
                           itemCount: cities.length,
                           itemBuilder: (context, index) {
                             final cityName = cities[index];
-                            final isCurrent = provider.weather?.cityName.toLowerCase() ==
+                            final isCurrent =
+                                provider.weather?.cityName.toLowerCase() ==
                                 cityName.toLowerCase();
 
                             return Padding(
@@ -112,14 +126,17 @@ class SavedLocationsDrawer extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: ListTile(
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 4,
+                                  ),
                                   title: Text(
                                     cityName,
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontWeight:
-                                          isCurrent ? FontWeight.bold : FontWeight.w500,
+                                      fontWeight: isCurrent
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
                                       fontSize: 16,
                                     ),
                                   ),
@@ -128,12 +145,20 @@ class SavedLocationsDrawer extends StatelessWidget {
                                     children: [
                                       if (isCurrent)
                                         Container(
-                                          margin: const EdgeInsets.only(right: 4),
+                                          margin: const EdgeInsets.only(
+                                            right: 4,
+                                          ),
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 3),
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(12),
+                                            color: Colors.white.withValues(
+                                              alpha: 0.2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                           child: const Text(
                                             'Active',
@@ -150,7 +175,8 @@ class SavedLocationsDrawer extends StatelessWidget {
                                           color: Colors.white70,
                                           size: 18,
                                         ),
-                                        onPressed: () => provider.toggleFavorite(cityName),
+                                        onPressed: () =>
+                                            provider.toggleFavorite(cityName),
                                         tooltip: 'Remove',
                                       ),
                                     ],

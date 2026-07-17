@@ -58,11 +58,12 @@ class Weather {
       pressure: json['main']['pressure'] as int,
       clouds: json['clouds']['all'] as int,
       sunrise: DateTime.fromMillisecondsSinceEpoch(
-          (json['sys']['sunrise'] as int) * 1000),
+        (json['sys']['sunrise'] as int) * 1000,
+      ),
       sunset: DateTime.fromMillisecondsSinceEpoch(
-          (json['sys']['sunset'] as int) * 1000),
-      dateTime: DateTime.fromMillisecondsSinceEpoch(
-          (json['dt'] as int) * 1000),
+        (json['sys']['sunset'] as int) * 1000,
+      ),
+      dateTime: DateTime.fromMillisecondsSinceEpoch((json['dt'] as int) * 1000),
       hourlyForecasts: const [],
       dailyForecasts: const [],
     );

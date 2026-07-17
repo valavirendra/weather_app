@@ -6,10 +6,7 @@ import 'glass_container.dart';
 class SunriseSunsetVisual extends StatelessWidget {
   final Weather weather;
 
-  const SunriseSunsetVisual({
-    super.key,
-    required this.weather,
-  });
+  const SunriseSunsetVisual({super.key, required this.weather});
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +64,8 @@ class SunriseSunsetVisual extends StatelessWidget {
 
                 final t = progress;
                 final bx = 2 * (1 - t) * t * (width / 2) + t * t * width;
-                final by = (1 - t) * (1 - t) * height +
+                final by =
+                    (1 - t) * (1 - t) * height +
                     2 * (1 - t) * t * (-height * 0.25) +
                     t * t * height;
 
@@ -91,7 +89,9 @@ class SunriseSunsetVisual extends StatelessWidget {
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.orangeAccent.withValues(alpha: 0.7),
+                                color: Colors.orangeAccent.withValues(
+                                  alpha: 0.7,
+                                ),
                                 blurRadius: 14,
                                 spreadRadius: 3,
                               ),
@@ -236,7 +236,8 @@ class SunArcPainter extends CustomPainter {
       for (int i = 1; i <= steps; i++) {
         final t = i / 60.0;
         final double bx = 2 * (1 - t) * t * (width / 2) + t * t * width;
-        final double by = (1 - t) * (1 - t) * height +
+        final double by =
+            (1 - t) * (1 - t) * height +
             2 * (1 - t) * t * (-height * 0.25) +
             t * t * height;
         activePath.lineTo(bx, by);

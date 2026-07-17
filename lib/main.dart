@@ -6,9 +6,7 @@ import 'providers/weather_provider.dart';
 void main() {
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => WeatherProvider()),
-      ],
+      providers: [ChangeNotifierProvider(create: (_) => WeatherProvider())],
       child: const MyApp(),
     ),
   );

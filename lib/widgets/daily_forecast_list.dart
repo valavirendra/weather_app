@@ -58,7 +58,9 @@ class DailyForecastList extends StatelessWidget {
             itemBuilder: (context, index) {
               final item = forecasts[index];
               final isToday = index == 0;
-              final dayStr = isToday ? 'Today' : DateFormat('EEEE').format(item.date);
+              final dayStr = isToday
+                  ? 'Today'
+                  : DateFormat('EEEE').format(item.date);
 
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -73,7 +75,9 @@ class DailyForecastList extends StatelessWidget {
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 15,
-                          fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                          fontWeight: isToday
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                         ),
                       ),
                     ),
@@ -86,11 +90,12 @@ class DailyForecastList extends StatelessWidget {
                             item.iconUrl,
                             width: 32,
                             height: 32,
-                            errorBuilder: (context, error, stackTrace) => const Icon(
-                              Icons.wb_sunny_outlined,
-                              size: 18,
-                              color: Colors.white70,
-                            ),
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(
+                                  Icons.wb_sunny_outlined,
+                                  size: 18,
+                                  color: Colors.white70,
+                                ),
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -120,9 +125,9 @@ class DailyForecastList extends StatelessWidget {
                               fontSize: 14,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Container(
-                            width: 50,
+                            width: 40,
                             height: 4,
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.12),
@@ -131,8 +136,8 @@ class DailyForecastList extends StatelessWidget {
                             child: Stack(
                               children: [
                                 Positioned(
-                                  left: 8,
-                                  right: 8,
+                                  left: 6,
+                                  right: 6,
                                   top: 0,
                                   bottom: 0,
                                   child: Container(
@@ -150,7 +155,7 @@ class DailyForecastList extends StatelessWidget {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Text(
                             _formatTemp(item.maxTempCelsius),
                             style: const TextStyle(

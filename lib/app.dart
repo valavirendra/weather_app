@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'screens/weather_screen.dart';
+import 'screens/splash_screen.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -16,12 +16,10 @@ class MyApp extends StatelessWidget {
           seedColor: const Color(0xFF4286F4),
           brightness: Brightness.dark,
         ),
-        textTheme: GoogleFonts.interTextTheme(
-          ThemeData.dark().textTheme,
-        ),
+        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
         scaffoldBackgroundColor: const Color(0xFF0F0E17),
       ),
-      home: const WeatherScreen(),
+      home: const SplashScreen(),
     );
   }
 }

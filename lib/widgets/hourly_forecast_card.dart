@@ -60,7 +60,9 @@ class HourlyForecastCard extends StatelessWidget {
               itemBuilder: (context, index) {
                 final item = forecasts[index];
                 final isFirst = index == 0;
-                final timeStr = isFirst ? 'Now' : DateFormat('ha').format(item.time);
+                final timeStr = isFirst
+                    ? 'Now'
+                    : DateFormat('ha').format(item.time);
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 16.0),
@@ -73,7 +75,10 @@ class HourlyForecastCard extends StatelessWidget {
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(18),
                       border: isFirst
-                          ? Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1)
+                          ? Border.all(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              width: 1,
+                            )
                           : null,
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -85,31 +90,40 @@ class HourlyForecastCard extends StatelessWidget {
                           style: TextStyle(
                             color: isFirst ? Colors.white : Colors.white70,
                             fontSize: 12,
-                            fontWeight: isFirst ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isFirst
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                         ),
                         Image.network(
                           item.iconUrl,
                           width: 40,
                           height: 40,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
-                            Icons.wb_cloudy_outlined,
-                            size: 26,
-                            color: Colors.white70,
-                          ),
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                                Icons.wb_cloudy_outlined,
+                                size: 26,
+                                color: Colors.white70,
+                              ),
                         ),
                         Text(
                           _formatTemp(item.tempCelsius),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,
-                            fontWeight: isFirst ? FontWeight.bold : FontWeight.w600,
+                            fontWeight: isFirst
+                                ? FontWeight.bold
+                                : FontWeight.w600,
                           ),
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.air, size: 8, color: Colors.white54),
+                            const Icon(
+                              Icons.air,
+                              size: 8,
+                              color: Colors.white54,
+                            ),
                             const SizedBox(width: 2),
                             Text(
                               '${item.windSpeed.toStringAsFixed(0)}m/s',
